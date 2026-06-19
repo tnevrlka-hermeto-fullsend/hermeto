@@ -1,0 +1,28 @@
+name: Mirror upstream issue
+description: Mirror an upstream issue for Fullsend agents to work on
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Enter the upstream issue number to mirror. The issue body and comments
+        will be fetched automatically after submission.
+  - type: input
+    id: upstream_issue
+    attributes:
+      label: Upstream issue number
+      description: Issue number from hermetoproject/hermeto
+      placeholder: "1400"
+    validations:
+      required: true
+  - type: dropdown
+    id: start_stage
+    attributes:
+      label: Starting stage
+      description: Which Fullsend stage should process this issue
+      options:
+        - triage
+        - code
+      default: 0
+    validations:
+      required: true
