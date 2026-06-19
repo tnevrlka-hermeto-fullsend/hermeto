@@ -16,12 +16,15 @@ from urllib3.util.retry import Retry
 
 from hermeto.core.config import get_config
 from hermeto.core.errors import FetchError
-from hermeto.core.http_requests import (
-    DEFAULT_RETRY_OPTIONS,
-    SAFE_REQUEST_METHODS,
-)
 from hermeto.core.scm import get_repo_id
 from hermeto.core.type_aliases import StrPath
+
+# The set includes only methods which don't modify state of the service.
+SAFE_REQUEST_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+DEFAULT_RETRY_OPTIONS: dict[str, Any] = {
+    "backoff_factor": 1.3,
+    "status_forcelist": (500, 502, 503, 504),
+}
 
 _pkg_requests_session: requests.Session | None = None
 
