@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Literal, cast
 
 import pypi_simple
 import requests
@@ -39,7 +39,6 @@ class DistributionPackageInfo:
     package_type: Literal["sdist", "wheel"]
     path: Path
     url: str
-    index_url: str
     is_yanked: bool
 
     # PyPi only returns a single checksum for a given download artifact
@@ -85,15 +84,6 @@ class DistributionPackageInfo:
             or len(self.req_file_checksums) == 0
         )
 
-    @property
-    def download_info(self) -> dict[str, Any]:
-        """Only necessary attributes to process download information."""
-        return {
-            "package": self.name,
-            "version": self.version,
-            "path": self.path,
-        }
-
 
 def _sdist_preference(sdist_pkg: DistributionPackageInfo) -> tuple[int, int]:
     """
@@ -129,14 +119,25 @@ def _get_project_packages_from(
     index_url: str,
     name: str,
     version: str,
+    auth: requests.auth.HTTPBasicAuth | None = None,
 ) -> Iterable[pypi_simple.DistributionPackage]:
     """Get all the project packages from the given index URL."""
     config = get_config()
     timeout = (config.http.connect_timeout, config.http.read_timeout)
-    with pypi_simple.PyPISimple(index_url) as client:
+    with pypi_simple.PyPISimple(index_url, auth=auth) as client:
         try:
             project_page = client.get_project_page(name, timeout)
         except (requests.RequestException, pypi_simple.NoSuchProjectError) as e:
+            if (
+                config.pip.proxy_url is not None
+                and isinstance(e, requests.HTTPError)
+                and e.response is not None
+                and e.response.status_code == 401
+            ):
+                raise FetchError(
+                    "Proxy requires authentication. "
+                    "Verify that proxy URL, login and password are set correctly."
+                ) from e
             raise FetchError(f"PyPI query failed: {e}") from e
 
     return filter(
@@ -153,6 +154,7 @@ def process_package_distributions(
     pip_deps_dir: RootedPath,
     binary_filters: PipBinaryFilters | None = None,
     index_url: str = pypi_simple.PYPI_SIMPLE_ENDPOINT,
+    auth: requests.auth.HTTPBasicAuth | None = None,
 ) -> list[DistributionPackageInfo]:
     """
     Return a list of DPI objects for the provided pip package.
@@ -183,7 +185,7 @@ def process_package_distributions(
     version = requirement.version_specs[0][1]
     req_file_checksums = set(map(ChecksumInfo.from_hash, requirement.hashes))
 
-    packages = list(_get_project_packages_from(index_url, name, version))
+    packages = list(_get_project_packages_from(index_url, name, version, auth=auth))
     sdists = filter(lambda x: x.package_type == "sdist", packages)
     wheels = filter(lambda x: x.package_type == "wheel", packages)
 
@@ -223,7 +225,6 @@ def process_package_distributions(
             cast(Literal["sdist", "wheel"], package.package_type),
             pip_deps_dir.join_within_root(package.filename).path,
             package.url,
-            index_url,
             package.is_yanked,
             pypi_checksums,
             req_file_checksums,
@@ -252,6 +253,8 @@ def _process_no_binary_mode(
     version: str,
 ) -> list[DistributionPackageInfo]:
     if not sdists:
+        # This error may occur when using a registry proxy that blocks packages it
+        # considers "bad" if it hides them from the index
         raise PackageRejected(
             f"No distributions found for package {name}=={version}",
             solution="Please check that the package exists and that the name and version are correct.",
@@ -291,6 +294,8 @@ def _process_only_binary_mode(
     version: str,
 ) -> list[DistributionPackageInfo]:
     if not wheels:
+        # This error may occur when using a registry proxy that blocks packages it
+        # considers "bad" if it hides them from the index
         raise PackageRejected(
             f"No wheels found for package {name}=={version}",
             solution="Please update the binary filters.",

@@ -201,9 +201,9 @@ async def test_async_download_binary_file(
     assert session.get.call_args == mock.call(
         url,
         timeout=aiohttp.ClientTimeout(total=None, connect=30, sock_read=300),
-        auth=None,
         raise_for_status=True,
         ssl=None,
+        headers=None,
     )
 
 
@@ -271,19 +271,27 @@ async def test_async_download_files(
 
 
 @pytest.mark.asyncio
-async def test_async_download_files_exception(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    url = "http://example.com/file.tar"
-    download_path = tmp_path / "file.tar"
+async def test_async_download_preserves_redirect_url_encoding(tmp_path: Path) -> None:
+    """Redirect URLs with percent-encoded query params must not be re-quoted."""
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
 
-    session = MagicMock()
+    async def redirect_handler(request: web.Request) -> web.Response:
+        return web.Response(
+            status=302,
+            headers={"Location": "/target?ResponseContentType=text%2Fplain"},
+        )
 
-    exception_message = "This is a test exception message."
-    session.get().__aenter__.side_effect = Exception(exception_message)
+    # we purposefully return the raw redirect URL in the body to verify what aiohttp did with it
+    async def target_handler(request: web.Request) -> web.Response:
+        return web.Response(status=200, body=request.raw_path.encode())
 
-    with pytest.raises(FetchError) as exc_info:
-        await _async_download_binary_file(session, url, download_path)
+    app = web.Application()
+    app.router.add_get("/redirect", redirect_handler)
+    app.router.add_get("/target", target_handler)
 
-    assert f"Unsuccessful download: {url}" in caplog.text
-    assert str(exc_info.value) == f"exception_name: Exception, details: {exception_message}"
+    async with TestServer(app) as server:
+        url = str(server.make_url("/redirect"))
+        download_path = tmp_path / "artifact"
+        await async_download_files({url: str(download_path)}, concurrency_limit=1)
+        assert b"text%2Fplain" in download_path.read_bytes()
