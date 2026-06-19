@@ -1,0 +1,29 @@
+name: Sync upstream
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Rebase onto upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/hermetoproject/hermeto.git
+          git fetch upstream main
+          git rebase upstream/main
+          git push --force-with-lease origin main
