@@ -7,6 +7,7 @@ on:
 
 permissions:
   issues: write
+  actions: write
 
 jobs:
   setup:
@@ -27,7 +28,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Check if variable exists
-          if gh variable list -R ${{ github.repository }} | grep -q MIRRORED_ISSUES; then
+          if gh variable list -R ${{ github.repository }} 2>/dev/null | grep -q MIRRORED_ISSUES; then
             echo "MIRRORED_ISSUES already exists, skipping"
           else
             gh variable set MIRRORED_ISSUES --body "" -R ${{ github.repository }}
