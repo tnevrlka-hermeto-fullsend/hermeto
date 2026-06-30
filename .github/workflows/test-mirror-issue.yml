@@ -17,4 +17,4 @@ jobs:
       upstream_repo: hermetoproject/hermeto
       mirror_issue_number: ${{ inputs.issue_number }}
     secrets:
-      variable_token: ${{ secrets.VARIABLE_TOKEN }}
+      variable_token: ${{ vars.VARIABLE_TOKEN }}
