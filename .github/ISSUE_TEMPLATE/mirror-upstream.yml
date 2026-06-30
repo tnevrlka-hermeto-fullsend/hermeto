@@ -1,6 +1,6 @@
 name: Mirror upstream issue
 description: Mirror an upstream issue for Fullsend agents to work on
-labels: []
+labels: [mirror]
 body:
   - type: markdown
     attributes:
