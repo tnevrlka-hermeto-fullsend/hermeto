@@ -1,0 +1,31 @@
+name: Setup test infrastructure
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create mirror label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create mirror \
+            --description "Issue mirrors an upstream issue" \
+            --color "1d76db" \
+            --force \
+            -R ${{ github.repository }}
+
+      - name: Set MIRRORED_ISSUES variable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if variable exists
+          if gh variable list -R ${{ github.repository }} | grep -q MIRRORED_ISSUES; then
+            echo "MIRRORED_ISSUES already exists, skipping"
+          else
+            gh variable set MIRRORED_ISSUES --body "" -R ${{ github.repository }}
+          fi
