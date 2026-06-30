@@ -7,7 +7,6 @@ on:
 
 permissions:
   issues: write
-  actions: write
 
 jobs:
   setup:
@@ -23,13 +22,27 @@ jobs:
             --force \
             -R ${{ github.repository }}
 
-      - name: Set MIRRORED_ISSUES variable
+      - name: Set MIRRORED_ISSUES variable  
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.VARIABLE_ADMIN_TOKEN }}
         run: |
-          # Check if variable exists
-          if gh variable list -R ${{ github.repository }} 2>/dev/null | grep -q MIRRORED_ISSUES; then
-            echo "MIRRORED_ISSUES already exists, skipping"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::No VARIABLE_ADMIN_TOKEN secret set. Attempting with default token..."
+            export GH_TOKEN="${{ github.token }}"
+          fi
+          # Try to create the variable
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/variables" \
+            -d '{"name":"MIRRORED_ISSUES","value":""}')
+          if [ "$RESP" = "201" ]; then
+            echo "Created MIRRORED_ISSUES variable"
+          elif [ "$RESP" = "409" ]; then
+            echo "MIRRORED_ISSUES already exists"
           else
-            gh variable set MIRRORED_ISSUES --body "" -R ${{ github.repository }}
+            echo "::warning::Could not create variable (HTTP $RESP). You may need to create it manually."
+            echo "Run: gh variable set MIRRORED_ISSUES --body '' -R ${{ github.repository }}"
           fi
