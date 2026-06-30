@@ -1,6 +1,9 @@
 name: Setup test infrastructure
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/setup-test-infra.yml'
 
 permissions:
   issues: write
