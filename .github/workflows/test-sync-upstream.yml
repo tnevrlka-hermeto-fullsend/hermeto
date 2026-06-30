@@ -1,0 +1,13 @@
+name: Test sync-upstream (reusable)
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    uses: hermeto-fullsend/workflows/.github/workflows/sync-upstream.yml@sync-upstream
+    with:
+      upstream_repo: hermetoproject/hermeto
